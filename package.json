@@ -1,0 +1,24 @@
+{
+  "name": "ghost-bounce",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Physics puzzle-platformer where every attempt becomes a ghost teammate.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "solve": "tsx tools/solve.ts"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "playwright-core": "^1.63.0",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}
