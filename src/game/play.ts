@@ -125,7 +125,9 @@ export class PlayScreen {
     if (s.commit()) {
       this.echoesRecorded++;
       this.audio.loop();
-      this.fx.doFlash('#9f7aea', 0.35);
+      this.fx.doFlash('#9f7aea', 0.18);
+      this.fx.ring(s.player.x, s.player.y, '#bda6ff', 110, 0.85);
+      this.fx.burst(s.player.x, s.player.y, '#bda6ff', 24, 160, { gravity: 0, kind: 'spark' });
       const e = s.echoes[s.echoes.length - 1];
       this.hooks.toast(`${replacing ? 'Replaced muted echo — ' : ''}Echo ${s.echoes.length} recorded. It will repeat your take.`, 'good');
       void e;
@@ -320,10 +322,12 @@ export class PlayScreen {
           break;
         case 'jump':
           if (!isGhost(e.b)) this.audio.jump({ pan });
+          this.fx.dust(e.x, e.y + 10, colorOf(e.b), 280);
           break;
         case 'burst':
           this.audio.burst({ ghost: isGhost(e.b), pan });
           this.fx.ring(e.x, e.y, colorOf(e.b), 30);
+          this.fx.burst(e.x, e.y, colorOf(e.b), 18, 240, { kind: 'spark', gravity: 0 });
           break;
         case 'anchor':
           this.audio.anchor({ ghost: isGhost(e.b), pan });
@@ -335,6 +339,7 @@ export class PlayScreen {
           break;
         case 'plate':
           this.audio.plate(e.on, { pan });
+          if (e.on) this.fx.burst(e.x, e.y, this.renderer.sigColor(e.id), 7, 55, { gravity: -60, kind: 'spark' });
           break;
         case 'switch':
           this.audio.switchFlip(e.on, { pan, ghost: e.b >= 0 && isGhost(e.b) });
@@ -355,7 +360,7 @@ export class PlayScreen {
           break;
         case 'shard':
           this.audio.shard();
-          this.fx.burst(e.x, e.y, '#e9d8fd', 24, 220, { gravity: 0 });
+          this.fx.burst(e.x, e.y, '#e9d8fd', 24, 220, { gravity: 0, kind: 'spark' });
           this.fx.ring(e.x, e.y, '#e9d8fd', 40, 0.7);
           break;
         case 'receiver':
@@ -367,8 +372,10 @@ export class PlayScreen {
           break;
         case 'exit':
           this.audio.win();
-          this.fx.burst(e.x, e.y, '#fffbea', 40, 300, { gravity: 0 });
-          this.fx.doFlash('#fffbea', 0.6);
+          this.fx.burst(e.x, e.y, '#fffbea', 40, 300, { gravity: 0, kind: 'spark', max: 1.2 });
+          this.fx.ring(e.x, e.y, '#a8efdc', 100, 0.9);
+          this.fx.ring(e.x, e.y, '#eed8ab', 60, 0.7);
+          this.fx.doFlash('#fffbea', 0.3);
           break;
       }
     }
@@ -400,6 +407,19 @@ export class PlayScreen {
       r.drawWorld({ ...opts, world: s.world, prev: this.prev, alpha, ghostOnly: false }, this.fx);
     }
     drawTimeline(r, s, this.time, { plan: !!this.plan, planTick: this.plan?.tick ?? 0, demo: !!this.demo });
+    if (this.input.held('rewind') && s.world.tick > 0 && !this.paused && !this.finished && !this.plan && !this.demo) {
+      r.withLevel(null, () => {
+        const ctx = r.ctx;
+        const wash = ctx.createLinearGradient(0, 0, this.level.width, 0);
+        wash.addColorStop(0, 'rgba(157,130,233,0.2)');
+        wash.addColorStop(0.25, 'transparent');
+        wash.addColorStop(0.75, 'transparent');
+        wash.addColorStop(1, 'rgba(157,130,233,0.2)');
+        ctx.fillStyle = wash; ctx.fillRect(0, 0, this.level.width, this.level.height);
+        ctx.fillStyle = '#d8c6ff'; ctx.font = '11px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('REWINDING', this.level.width / 2, this.level.height - 15);
+      });
+    }
     this.drawOverlayText();
   }
 

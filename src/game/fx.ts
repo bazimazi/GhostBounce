@@ -20,8 +20,10 @@ export class Fx {
   flash = 0;
   flashColor = '#fff';
   shakeEnabled = true;
+  private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 
   burst(x: number, y: number, color: string, n: number, speed: number, opts: Partial<Particle> = {}) {
+    n = Math.min(this.reducedMotion.matches ? 4 : n, Math.max(0, 320 - this.particles.length));
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2;
       const s = speed * (0.3 + Math.random() * 0.7);
@@ -65,11 +67,11 @@ export class Fx {
   }
 
   addShake(amount: number) {
-    if (this.shakeEnabled) this.shake = Math.min(12, this.shake + amount);
+    if (this.shakeEnabled && !this.reducedMotion.matches) this.shake = Math.min(12, this.shake + amount);
   }
 
   doFlash(color: string, amount = 0.5) {
-    this.flash = amount;
+    this.flash = this.reducedMotion.matches ? 0 : amount;
     this.flashColor = color;
   }
 
@@ -87,6 +89,7 @@ export class Fx {
   }
 
   draw(ctx: CanvasRenderingContext2D) {
+    ctx.save();
     for (const p of this.particles) {
       const t = p.life / p.max;
       ctx.globalAlpha = 1 - t;
@@ -103,6 +106,14 @@ export class Fx {
         ctx.rotate(p.life * 8);
         ctx.fillRect(-p.size / 2, -p.size, p.size, p.size * 2);
         ctx.restore();
+      } else if (p.kind === 'spark') {
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = Math.max(0.5, p.size * (1 - t));
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.035, p.y - p.vy * 0.035);
+        ctx.stroke();
       } else {
         ctx.fillStyle = p.color;
         ctx.beginPath();
@@ -110,6 +121,6 @@ export class Fx {
         ctx.fill();
       }
     }
-    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 }

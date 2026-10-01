@@ -9,11 +9,23 @@ export function drawTimeline(r: Renderer, s: Session, time: number, opts: { plan
   const W = L.width;
   const H = r.hudHeight;
   r.withHud(() => {
-    ctx.fillStyle = '#0a0c14';
+    const backdrop = ctx.createLinearGradient(0, 0, 0, H);
+    backdrop.addColorStop(0, '#122530'); backdrop.addColorStop(1, '#09151e');
+    ctx.fillStyle = backdrop;
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+    ctx.fillStyle = 'rgba(154,218,211,0.25)';
     ctx.fillRect(0, 0, W, 1);
 
+    ctx.textAlign = 'left';
+    ctx.font = '8px monospace'; ctx.fillStyle = '#85aaa9';
+    ctx.fillText('ECHO DECK', 14, 17);
+    ctx.font = '600 18px monospace'; ctx.fillStyle = '#e7e5d7';
+    ctx.fillText(String(s.takesStarted).padStart(2, '0'), 14, 39);
+    ctx.font = '8px monospace'; ctx.fillStyle = '#85aaa9';
+    ctx.fillText(opts.plan ? 'PLANNING' : opts.demo ? 'PLAYBACK' : s.status === 'running' ? 'RECORDING' : 'STANDBY', 14, 55);
+    ctx.fillStyle = s.status === 'running' ? '#a4ecd3' : '#4b6871';
+    ctx.globalAlpha = s.status === 'running' ? 0.65 + Math.sin(time * 3) * 0.25 : 1;
+    ctx.beginPath(); ctx.arc(73, 14, 2, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
     const left = 118;
     const right = W - 150;
     const tw = right - left;
@@ -89,9 +101,9 @@ export function drawTimeline(r: Renderer, s: Session, time: number, opts: { plan
     ctx.fillText(`${secs}s / ${L.def.loopSeconds}s`, right + 16, 18);
     ctx.font = '12px system-ui, sans-serif';
     ctx.fillStyle = s.liveEchoCount >= L.def.maxEchoes ? '#fbd38d' : '#a0aec0';
-    ctx.fillText(`Echoes ${s.echoes.length}/${L.def.maxEchoes}`, right + 16, 38);
+    ctx.fillText(L.def.maxEchoes ? `Echoes ${s.echoes.length}/${L.def.maxEchoes}` : 'Solo passage', right + 16, 38);
     ctx.fillStyle = '#718096';
     ctx.fillText(`Take ${s.takesStarted}`, right + 16, 56);
-    void time;
+
   });
 }

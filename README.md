@@ -49,6 +49,10 @@ All keys can be rebound in Settings. Touch controls appear on touch devices.
 - Deterministic replays with divergence detection, hold-to-rewind, plan view.
 - Synthesised audio and generative music, no external assets.
 - Versioned, corruption-resistant saves with export/import.
+- A procedural celestial observatory with layered architecture, animated
+  clockwork, glass characters, illuminated platforms, spectral trails and
+  event-driven particles. Menu and ambient animation respect the operating
+  system's reduced-motion preference.
 
 ## Development
 
@@ -59,6 +63,18 @@ npm run solve -- all         # verify every level's reference solution
 npm run solve -- w3-2        # trace one level's solution tick by tick
 npx tsx tools/measure.ts     # movement numbers used by level designers
 ```
+
+Visual smoke checks (with the dev server running):
+
+```powershell
+$env:GAME_URL = 'http://127.0.0.1:5173' # use the URL printed by Vite
+node tools/visual-check.mjs
+```
+
+The visual check uses installed Microsoft Edge by default. Set `BROWSER_PATH`
+to another Chromium browser executable if needed. It checks movement, echoes,
+rewind, menu navigation, all 43 rooms, reduced motion, and mobile layouts,
+and saves screenshots in `.artifacts/visual/`.
 
 Documentation:
 

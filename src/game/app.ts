@@ -24,6 +24,7 @@ import {
   worldUnlocked,
 } from './progression';
 import { Renderer } from './renderer';
+import { drawMotes, drawOrb, drawOrrery, glow, paintObservatory } from './scenery';
 import { SaveManager } from './save';
 import { SKINS, TRAILS, worldTheme } from './theme';
 
@@ -60,7 +61,10 @@ export class App {
   private toastTimer = 0;
   private lastFrame = performance.now();
   private overlay: HTMLElement | null = null;
-  private titleBalls = Array.from({ length: 7 }, (_, i) => ({ x: 100 + i * 110, y: 100 + (i % 3) * 60, vx: 60 + i * 13, vy: 0 }));
+  private menuTime = 0;
+  private menuBackdrop: HTMLCanvasElement | null = null;
+  private menuBackdropKey = '';
+  private reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   private playSecondsAcc = 0;
 
   constructor(root: HTMLElement) {
@@ -74,7 +78,7 @@ export class App {
     this.saves = new SaveManager(store);
     this.canvas = h('canvas', { id: 'game' }) as HTMLCanvasElement;
     this.ui = h('div', { id: 'ui' });
-    this.toastEl = h('div', { id: 'toast' });
+    this.toastEl = h('div', { id: 'toast', role: 'status', 'aria-live': 'polite' });
     root.append(this.canvas, this.ui, this.toastEl);
     this.renderer = new Renderer(this.canvas);
     this.input = new Input(this.saves.data.settings.bindings);
@@ -237,46 +241,70 @@ export class App {
   }
 
   private drawTitleBackground(dt: number) {
-    // A few luminous balls bouncing behind the menus.
     const c = this.canvas;
     const ctx = c.getContext('2d')!;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    const w = c.clientWidth;
-    const hgt = c.clientHeight;
+    const w = c.clientWidth, hgt = c.clientHeight;
     if (c.width !== Math.round(w * dpr)) c.width = Math.round(w * dpr);
     if (c.height !== Math.round(hgt * dpr)) c.height = Math.round(hgt * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const th = worldTheme(this.screen === 'levels' ? this.currentWorld : 1);
-    const g = ctx.createLinearGradient(0, 0, 0, hgt);
-    g.addColorStop(0, th.bgTop);
-    g.addColorStop(1, th.bgBottom);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, w, hgt);
-    ctx.strokeStyle = th.ring;
-    ctx.lineWidth = 2;
-    for (let r = 80; r < Math.max(w, hgt); r += 90) {
-      ctx.beginPath();
-      ctx.arc(w * 0.7, hgt * 0.4, r, 0, Math.PI * 2);
-      ctx.stroke();
+    this.menuTime += this.reducedMotion.matches ? 0 : dt;
+    const t = this.menuTime;
+    const world = this.screen === 'levels' ? this.currentWorld : 1;
+    const th = worldTheme(world);
+    const key = `${w}:${hgt}:${world}:${dpr}`;
+    if (this.menuBackdropKey !== key) {
+      this.menuBackdropKey = key;
+      this.menuBackdrop = document.createElement('canvas');
+      this.menuBackdrop.width = c.width; this.menuBackdrop.height = c.height;
+      const bg = this.menuBackdrop.getContext('2d')!;
+      bg.scale(dpr, dpr); paintObservatory(bg, w, hgt, th);
     }
-    const colors = ['#fff6df', '#4fd1c5', '#b794f4', '#f6ad55', '#f687b3', '#68d391', '#63b3ed'];
-    this.titleBalls.forEach((b, i) => {
-      b.vy += 900 * dt;
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      if (b.y > hgt - 40) {
-        b.y = hgt - 40;
-        b.vy = -Math.max(420, Math.abs(b.vy) * 0.92);
-      }
-      if (b.x < 20 || b.x > w - 20) b.vx *= -1;
-      b.x = Math.max(20, Math.min(w - 20, b.x));
-      ctx.globalAlpha = i === 0 ? 0.9 : 0.35;
-      ctx.fillStyle = colors[i];
-      ctx.beginPath();
-      ctx.arc(b.x, b.y, 14, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.globalAlpha = 1;
+    ctx.drawImage(this.menuBackdrop!, 0, 0, w, hgt);
+    const title = this.screen === 'title';
+    const compact = w < 760 || hgt < 460;
+    const cx = w * (compact ? 0.75 : 0.73), cy = hgt * 0.45;
+    const radius = Math.min(w * 0.22, hgt * 0.34, 280);
+    drawOrrery(ctx, cx, cy, radius, t, th, title ? 1.7 : 0.5);
+    drawMotes(ctx, w, hgt, t, th);
+    if (!title || compact) return;
+    ctx.save();
+    ctx.translate(cx, cy);
+    // An orbital tableau: your past selves tracing a path through the Horologe.
+    ctx.strokeStyle = 'rgba(159,220,220,0.22)'; ctx.lineWidth = 1;
+    ctx.setLineDash([2, 7]);
+    ctx.beginPath(); ctx.ellipse(0, 22, radius * 0.88, radius * 0.46, -0.36, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+    const colors = ['#69ded1', '#bba0ec', '#82bbed'];
+    for (let i = 0; i < 3; i++) {
+      const a = t * 0.15 + i * 1.7 + 0.8;
+      const x = Math.cos(a) * radius * 0.8;
+      const y = Math.sin(a) * radius * 0.4 + 22;
+      glow(ctx, x, y, 48, colors[i] + '22');
+      ctx.globalAlpha = 0.72;
+      drawOrb(ctx, x, y, 17 + i * 2, colors[i], colors[i], t + i, -1);
+      ctx.globalAlpha = 1;
+      ctx.font = '10px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = colors[i];
+      ctx.fillText(`ECHO 0${i + 1}`, x, y + 36);
+    }
+    const bounce = Math.sin(t * 1.6) * 12;
+    glow(ctx, -10, -15 + bounce, 130, 'rgba(255,213,144,0.18)');
+    drawOrb(ctx, -10, -15 + bounce, 46, '#fff8df', '#e9bf79', t, -0.5);
+    // Floating brass instrument beneath the hero.
+    const py = radius * 0.7;
+    ctx.fillStyle = '#0b202a';
+    ctx.beginPath(); ctx.ellipse(0, py + 12, 104, 25, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(-104, py, 208, 12);
+    const plate = ctx.createLinearGradient(0, py - 22, 0, py + 22);
+    plate.addColorStop(0, '#42616a'); plate.addColorStop(1, '#142e3b');
+    ctx.fillStyle = plate; ctx.strokeStyle = '#a99e70'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.ellipse(0, py, 104, 25, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(117,219,211,0.45)';
+    ctx.beginPath(); ctx.ellipse(0, py, 79, 16, 0, 0, Math.PI * 2); ctx.stroke();
+    glow(ctx, 0, py, 90, 'rgba(115,236,215,0.11)');
+    ctx.font = '10px monospace'; ctx.fillStyle = '#a8c6c8'; ctx.textAlign = 'center';
+    ctx.fillText('THE HOROLOGE / ECHO CHAMBER', 0, py + 65);
+    ctx.restore();
   }
 
   /** Clicking an echo's lane in the timeline mutes / restores it. */
@@ -303,6 +331,8 @@ export class App {
 
   private setScreen(s: Screen, content: HTMLElement) {
     this.screen = s;
+    this.toastTimer = 0;
+    this.toastEl.classList.remove('show');
     this.ui.replaceChildren(content);
     this.ui.classList.toggle('in-play', s === 'play');
     document.body.classList.toggle('playing', s === 'play');
@@ -316,18 +346,26 @@ export class App {
     const t = totals(this.save);
     const has = this.saves.hasProgress;
     const menu = h(
-      'div',
-      { class: 'menu title-menu' },
-      h('h1', { class: 'logo' }, 'Ghost', h('span', {}, ' Bounce')),
-      h('p', { class: 'tagline' }, 'Every attempt becomes a teammate.'),
-      has ? button('Continue', () => this.startLevel(continueLevel(this.save)), 'primary') : null,
-      button(has ? 'New Game' : 'Start', () => this.newGame(), has ? '' : 'primary'),
-      button('Worlds', () => this.showWorlds()),
-      button('Challenges', () => this.showChallenges()),
-      button('Collection', () => this.showCollection()),
-      button('Settings', () => this.showSettings()),
-      button('Credits', () => this.showCredits()),
-      has ? h('p', { class: 'small' }, `${t.solved} puzzles solved · ${t.marks}/${t.possible} marks · ${t.shards} shards`) : null,
+      'div', { class: 'menu title-menu' },
+      h('div', { class: 'eyebrow' }, h('span', { class: 'status-light' }), 'A TIME-LOOP PUZZLE ADVENTURE'),
+      h('h1', { class: 'logo' }, 'GHOST', h('span', {}, 'BOUNCE')),
+      h('p', { class: 'title-tagline' }, 'A little courage.', h('br'), 'A few past selves.'),
+      h('p', { class: 'title-description' }, 'Leave an echo. Change the outcome. Find your way through a clockwork world where every attempt becomes a teammate.'),
+      h('div', { class: 'title-actions' },
+        has ? button('Continue journey  \u2192', () => this.startLevel(continueLevel(this.save)), 'primary') : null,
+        button(has ? 'New journey' : 'Begin journey  \u2192', () => this.newGame(), has ? '' : 'primary'),
+        button('Explore worlds', () => this.showWorlds()),
+      ),
+      h('nav', { class: 'title-nav', 'aria-label': 'Game menu' },
+        button('Challenges', () => this.showChallenges()),
+        button('Collection', () => this.showCollection()),
+        button('Settings', () => this.showSettings()),
+        button('Credits', () => this.showCredits()),
+      ),
+      h('div', { class: 'title-footer' },
+        h('span', {}, '07 WORLDS'), h('span', {}, 'INFINITE SECOND CHANCES'),
+      ),
+      has ? h('p', { class: 'small' }, `${t.solved} puzzles solved \u00b7 ${t.marks}/${t.possible} marks \u00b7 ${t.shards} shards`) : null,
     );
     this.setScreen('title', menu);
   }
@@ -434,11 +472,13 @@ export class App {
     const hud = h(
       'div',
       { class: 'play-bar' },
+      h('span', { class: 'play-world' }, `CHAPTER ${String(def.world || 0).padStart(2, '0')}`),
       h('span', { class: 'lvl' }, def.name),
       h('span', { class: 'keys' }, this.keyHelp(def)),
       button('❚❚', () => this.pause(), 'icon'),
     );
     hud.querySelector('button')!.setAttribute('tabindex', '-1');
+    hud.querySelector('button')!.setAttribute('aria-label', 'Pause game');
     this.setScreen('play', hud);
     (document.activeElement as HTMLElement | null)?.blur();
   }
